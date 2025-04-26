@@ -23,9 +23,9 @@ func NewServer(logger *log.Logger) (*Server, error) {
 	}
 
 	// Проверяем наличие index.html
-	_, err := os.Stat("static/index.html")
+	_, err := os.Stat("index.html")
 	if err != nil {
-		return nil, fmt.Errorf("static/index.html not found: %w", err)
+		return nil, fmt.Errorf("index.html not found: %w", err)
 	}
 
 	router := http.NewServeMux()
@@ -68,7 +68,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 	// Отправляем index.html
-	http.ServeFile(w, r, "static/index.html")
+	http.ServeFile(w, r, "index.html")
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
