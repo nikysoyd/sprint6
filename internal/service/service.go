@@ -2,88 +2,92 @@ package service
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 )
 
-// morseCodeMap содержит соответствие символов и кода Морзе
-var morseCodeMap = map[string]string{
+var morseCode = map[string]string{
 	"A": ".-", "B": "-...", "C": "-.-.", "D": "-..", "E": ".",
 	"F": "..-.", "G": "--.", "H": "....", "I": "..", "J": ".---",
 	"K": "-.-", "L": ".-..", "M": "--", "N": "-.", "O": "---",
 	"P": ".--.", "Q": "--.-", "R": ".-.", "S": "...", "T": "-",
 	"U": "..-", "V": "...-", "W": ".--", "X": "-..-", "Y": "-.--",
-	"Z": "--..", "1": ".----", "2": "..---", "3": "...--", "4": "....-",
-	"5": ".....", "6": "-....", "7": "--...", "8": "---..", "9": "----.",
-	"0": "-----", " ": "/",
+	"Z": "--..", "0": "-----", "1": ".----", "2": "..---", "3": "...--",
+	"4": "....-", "5": ".....", "6": "-....", "7": "--...", "8": "---..",
+	"9": "----.",
 }
 
-// reverseMorseCodeMap содержит обратное соответствие кода Морзе и символов
-var reverseMorseCodeMap = make(map[string]string)
+var reverseMorse = make(map[string]string)
 
 func init() {
-	// Инициализация обратного словаря
-	for k, v := range morseCodeMap {
-		reverseMorseCodeMap[v] = k
+	for k, v := range morseCode {
+		reverseMorse[v] = k
 	}
 }
 
-// AutoDetectAndConvert автоматически определяет тип ввода и конвертирует
-func AutoDetectAndConvert(input string) (string, error) {
+// Convert определяет тип входной строки (текст или код Морзе) и конвертирует
+func Convert(input string) (string, error) {
+	input = strings.TrimSpace(input)
 	if input == "" {
-		return "", errors.New("пустая строка ввода")
+		return "", errors.New("empty input")
 	}
 
-	// Определяем тип ввода
-	if isMorseCode(input) {
-		// Конвертируем код Морзе в текст
+	// Проверяем, является ли строка кодом Морзе
+	isMorse := strings.ContainsAny(input, ".-") && !strings.ContainsAny(input, "abcdefghijklmnopqrstuvwxyz0123456789")
+
+	if isMorse {
 		return morseToText(input)
 	}
-	// Конвертируем текст в код Морзе
 	return textToMorse(input)
-}
-
-// isMorseCode проверяет, является ли строка кодом Морзе
-func isMorseCode(s string) bool {
-	for _, r := range s {
-		if !(r == '.' || r == '-' || r == ' ' || r == '/') {
-			return false
-		}
-	}
-	return true
-}
-
-// textToMorse конвертирует текст в код Морзе
-func textToMorse(text string) (string, error) {
-	var result strings.Builder
-
-	for _, char := range strings.ToUpper(text) {
-		strChar := string(char)
-		morse, ok := morseCodeMap[strChar]
-		if !ok {
-			return "", fmt.Errorf("неподдерживаемый символ: %s", strChar)
-		}
-		result.WriteString(morse)
-		result.WriteString(" ")
-	}
-
-	return strings.TrimSpace(result.String()), nil
 }
 
 // morseToText конвертирует код Морзе в текст
 func morseToText(morse string) (string, error) {
+	words := strings.Split(morse, " / ")
 	var result strings.Builder
 
-	codes := strings.Split(morse, " ")
-	for _, code := range codes {
-		if code == "" {
-			continue
+	for i, word := range words {
+		chars := strings.Split(word, " ")
+		for j, char := range chars {
+			if char == "" {
+				continue
+			}
+			if letter, exists := reverseMorse[char]; exists {
+				result.WriteString(letter)
+			} else {
+				return "", errors.New("invalid morse code: " + char)
+			}
+			if j < len(chars)-1 {
+				result.WriteString("")
+			}
 		}
-		char, ok := reverseMorseCodeMap[code]
-		if !ok {
-			return "", fmt.Errorf("некорректный код Морзе: %s", code)
+		if i < len(words)-1 {
+			result.WriteString(" ")
 		}
-		result.WriteString(char)
+	}
+
+	return result.String(), nil
+}
+
+// textToMorse конвертирует текст в код Морзе
+func textToMorse(text string) (string, error) {
+	text = strings.ToUpper(text)
+	words := strings.Split(text, " ")
+	var result strings.Builder
+
+	for i, word := range words {
+		for j, char := range word {
+			if code, exists := morseCode[string(char)]; exists {
+				result.WriteString(code)
+				if j < len(word)-1 {
+					result.WriteString(" ")
+				}
+			} else {
+				return "", errors.New("invalid character: " + string(char))
+			}
+		}
+		if i < len(words)-1 {
+			result.WriteString(" / ")
+		}
 	}
 
 	return result.String(), nil

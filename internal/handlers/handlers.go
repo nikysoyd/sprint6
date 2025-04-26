@@ -1,88 +1,75 @@
 package handlers
 
 import (
-	"log"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
+
+	"your_module_name/service" // Замените на актуальный путь к пакету service
 )
 
-// Server структура для нашего HTTP сервера
-type Server struct {
-	logger     *log.Logger
-	httpServer *http.Server
+// IndexHandler обрабатывает запрос к корневому эндпоинту /
+func IndexHandler(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "index.html")
 }
 
-// NewServer создает новый экземпляр сервера
-func NewServer(logger *log.Logger) *Server {
-	// Создаем роутер
-	router := createRouter(logger)
-
-	// Конфигурируем HTTP сервер
-	httpServer := &http.Server{
-		Addr:         ":8080",
-		Handler:      router,
-		ErrorLog:     logger,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  15 * time.Second,
+// UploadHandler обрабатывает загрузку файла и конвертацию
+func UploadHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
 
-	return &Server{
-		logger:     logger,
-		httpServer: httpServer,
+	// Парсинг формы с лимитом 10MB
+	err := r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		http.Error(w, "Failed to parse form: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
-}
 
-// createRouter создает и настраивает HTTP роутер
-func createRouter(logger *log.Logger) *http.ServeMux {
-	router := http.NewServeMux()
-
-	// Регистрируем обработчики
-	router.HandleFunc("/", rootHandler(logger))
-	router.HandleFunc("/upload", uploadHandler(logger))
-
-	return router
-}
-
-// rootHandler обработчик для корневого пути
-func rootHandler(logger *log.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		logger.Println("Handling root request")
-		w.Write([]byte("Hello, World!"))
+	// Получение файла из формы
+	file, handler, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Failed to get file: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
-}
+	defer file.Close()
 
-// uploadHandler обработчик для загрузки файлов
-func uploadHandler(logger *log.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		logger.Println("Handling upload request")
-		// Здесь должна быть логика обработки загрузки файла
-		w.Write([]byte("File uploaded successfully"))
+	// Чтение содержимого файла
+	data, err := io.ReadAll(file)
+	if err != nil {
+		http.Error(w, "Failed to read file: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
-}
 
-// Start запускает сервер
-func (s *Server) Start() error {
-	s.logger.Printf("Starting server on %s", s.httpServer.Addr)
-	return s.httpServer.ListenAndServe()
-}
-
-func main() {
-	// Инициализируем логгер
-	logger := log.New(os.Stdout, "HTTP_SERVER: ", log.LstdFlags|log.Lshortfile)
-
-	// Создаем и запускаем сервер
-	server := NewServer(logger)
-	if err := server.Start(); err != nil {
-		logger.Fatalf("Server failed to start: %v", err)
+	// Конвертация данных с помощью функции из пакета service
+	result, err := service.Convert(string(data))
+	if err != nil {
+		http.Error(w, "Conversion failed: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
+
+	// Генерация имени выходного файла
+	ext := filepath.Ext(handler.Filename)
+	outputFilename := fmt.Sprintf("output_%s%s", time.Now().UTC().Format("20060102150405"), ext)
+	outputFile, err := os.Create(outputFilename)
+	if err != nil {
+		http.Error(w, "Failed to create output file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer outputFile.Close()
+
+	// Запись результата в файл
+	_, err = outputFile.WriteString(result)
+	if err != nil {
+		http.Error(w, "Failed to write to output file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Отправка результата клиенту
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Conversion successful. Result: %s\nSaved to: %s", result, outputFilename)
 }

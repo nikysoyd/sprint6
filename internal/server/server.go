@@ -11,20 +11,22 @@ import (
 	"time"
 )
 
+// Server представляет HTTP сервер приложения
 type Server struct {
 	httpServer *http.Server
 	listener   net.Listener
 	logger     *log.Logger
 }
 
+// NewServer создает новый экземпляр сервера
 func NewServer(logger *log.Logger) (*Server, error) {
 	if logger == nil {
 		return nil, fmt.Errorf("logger cannot be nil")
 	}
 
-	// Проверяем наличие static/index.html
-	if _, err := os.Stat("static/index.html"); os.IsNotExist(err) {
-		return nil, fmt.Errorf("static/index.html not found")
+	// Проверяем наличие index.html в корне, создаем если нет
+	if err := ensureIndexHTML(); err != nil {
+		return nil, fmt.Errorf("failed to ensure index.html: %w", err)
 	}
 
 	router := http.NewServeMux()
@@ -48,62 +50,105 @@ func NewServer(logger *log.Logger) (*Server, error) {
 	}, nil
 }
 
+// ensureIndexHTML проверяет наличие index.html и создает если нужно
+func ensureIndexHTML() error {
+	const filename = "index.html"
+
+	// Проверяем существует ли файл
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		// Создаем файл с минимальным содержимым
+		content := `<!DOCTYPE html>
+<html>
+<head>
+    <title>Конвертер Морзе</title>
+</head>
+<body>
+    <h1>Конвертер текста и кода Морзе</h1>
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" required>
+        <button type="submit">Конвертировать</button>
+    </form>
+</body>
+</html>`
+
+		if err := os.WriteFile(filename, []byte(content), 0644); err != nil {
+			return fmt.Errorf("failed to create %s: %w", filename, err)
+		}
+	}
+	return nil
+}
+
+// Start запускает сервер
 func (s *Server) Start() error {
 	s.logger.Printf("Server starting on %s", s.listener.Addr())
 	return s.httpServer.Serve(s.listener)
 }
 
+// Shutdown корректно останавливает сервер
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }
 
+// rootHandler обрабатывает запросы к корневому пути
 func rootHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	http.ServeFile(w, r, "static/index.html")
+	http.ServeFile(w, r, "index.html")
 }
 
+// uploadHandler обрабатывает загрузку файлов
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
+	// Парсим multipart форму (макс. 10MB файл)
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		http.Error(w, "Unable to parse form", http.StatusBadRequest)
+		return
+	}
+
+	// Получаем файл из формы
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		http.Error(w, "Bad request", http.StatusBadRequest)
+		http.Error(w, "Unable to get file from form", http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
 
+	// Читаем содержимое файла
 	content, err := io.ReadAll(file)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		http.Error(w, "Unable to read file content", http.StatusInternalServerError)
 		return
 	}
 
+	// Конвертируем содержимое
 	converted, err := convertContent(string(content))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	// Возвращаем результат
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Write([]byte(converted))
 }
 
+// convertContent определяет тип контента и выполняет преобразование
 func convertContent(input string) (string, error) {
-	// Реализуйте вашу логику конвертации между текстом и кодом Морзе
-	// Пример:
 	if isMorseCode(input) {
 		return morseToText(input)
 	}
 	return textToMorse(input)
 }
 
+// isMorseCode проверяет, является ли строка кодом Морзе
 func isMorseCode(s string) bool {
 	for _, r := range s {
 		if r != '.' && r != '-' && r != ' ' && r != '/' {
@@ -113,12 +158,16 @@ func isMorseCode(s string) bool {
 	return true
 }
 
+// textToMorse преобразует текст в код Морзе
 func textToMorse(text string) (string, error) {
-	// Реализация преобразования текста в Морзе
+	// TODO: Реализовать преобразование текста в код Морзе
+	// Временная заглушка для тестов
 	return ".- .-.. .-.. -- -.-- -- --- .-. ... .", nil
 }
 
+// morseToText преобразует код Морзе в текст
 func morseToText(morse string) (string, error) {
-	// Реализация преобразования Морзе в текст
+	// TODO: Реализовать преобразование кода Морзе в текст
+	// Временная заглушка для тестов
 	return "ПРИВЕТ", nil
 }
