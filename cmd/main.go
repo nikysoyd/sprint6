@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/nikysoyd/sprint6/server" // Замените на актуальный путь к пакету server
+	"github.com/nikysoyd/sprint6/internal/server" // Замените на актуальный путь к пакету server
 )
 
 func main() {
