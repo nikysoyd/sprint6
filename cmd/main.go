@@ -25,17 +25,19 @@ func main() {
 		logger.Fatalf("Server creation failed: %v", err)
 	}
 
+	// Graceful shutdown
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
+		logger.Println("Server starting on :8080")
 		if err := srv.Start(); err != nil && err != http.ErrServerClosed {
 			logger.Fatalf("Server failed: %v", err)
 		}
 	}()
 
-	logger.Println("Server ready on :8080")
 	<-done
+	logger.Println("Server stopping...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
