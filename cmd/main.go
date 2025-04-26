@@ -15,12 +15,16 @@ import (
 func main() {
 	logger := log.New(os.Stdout, "SERVER: ", log.LstdFlags|log.Lshortfile)
 
+	// Создаем папку static если её нет
+	if err := os.MkdirAll("static", 0755); err != nil {
+		logger.Fatalf("Failed to create static dir: %v", err)
+	}
+
 	srv, err := server.NewServer(logger)
 	if err != nil {
 		logger.Fatalf("Server creation failed: %v", err)
 	}
 
-	// Graceful shutdown
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 

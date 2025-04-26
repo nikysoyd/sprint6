@@ -3,9 +3,11 @@ package server
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -20,11 +22,16 @@ func NewServer(logger *log.Logger) (*Server, error) {
 		return nil, fmt.Errorf("logger cannot be nil")
 	}
 
+	// Проверяем наличие index.html
+	_, err := os.Stat("static/index.html")
+	if err != nil {
+		return nil, fmt.Errorf("static/index.html not found: %w", err)
+	}
+
 	router := http.NewServeMux()
 	router.HandleFunc("/", rootHandler)
 	router.HandleFunc("/upload", uploadHandler)
 
-	// Создаем listener заранее, чтобы проверить доступность порта
 	listener, err := net.Listen("tcp", ":8080")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create listener: %w", err)
@@ -56,6 +63,11 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
+	// Устанавливаем правильный Content-Type
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+	// Отправляем index.html
 	http.ServeFile(w, r, "static/index.html")
 }
 
@@ -64,5 +76,61 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	// Обработка загрузки файла...
+
+	// Получаем файл из формы
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	// Читаем содержимое файла
+	content, err := io.ReadAll(file)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Конвертируем содержимое
+	converted, err := convertContent(string(content))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Возвращаем результат
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Write([]byte(converted))
+}
+
+func convertContent(input string) (string, error) {
+	// Здесь должна быть ваша логика конвертации
+	// между текстом и кодом Морзе
+	// Это пример - замените на реальную реализацию
+
+	if isMorseCode(input) {
+		return morseToText(input)
+	}
+	return textToMorse(input)
+}
+
+func isMorseCode(s string) bool {
+	// Проверяем, является ли строка кодом Морзе
+	for _, r := range s {
+		if r != '.' && r != '-' && r != ' ' && r != '/' {
+			return false
+		}
+	}
+	return true
+}
+
+func textToMorse(text string) (string, error) {
+	// Реализация преобразования текста в Морзе
+	return ".- .-.. .-.. -- -.-- -- --- .-. ... .", nil
+}
+
+func morseToText(morse string) (string, error) {
+	// Реализация преобразования Морзе в текст
+	return "ПРИВЕТ", nil
 }
