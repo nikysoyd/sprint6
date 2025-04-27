@@ -1,9 +1,12 @@
 package handlers
 
 import (
-	"html/template"
+	//"html/template"
 	"io"
-	"log"
+	"strings"
+
+	//"log"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,78 +15,58 @@ import (
 	"github.com/nikysoyd/sprint6/internal/service"
 )
 
-const (
-	formFileName = "file"
-	maxFileSize  = 1 << 20 // 1MB
-)
-
-func RootHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	tmpl, err := template.ParseFiles("templates/index.html")
-	if err != nil {
-		log.Printf("Error parsing template: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	if err := tmpl.Execute(w, nil); err != nil {
-		log.Printf("Error executing template: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+// ServeHome обрабатывает корневой эндпоинт и отдает index.html
+func ServeHome(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	http.ServeFile(w, r, "pwd/index.html")
 }
 
+// UploadHandler обрабатывает загрузку файла
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		http.Error(w, "Ошибка при разборе формы", http.StatusInternalServerError)
 		return
 	}
 
-	// Parse the multipart form
-	if err := r.ParseMultipartForm(maxFileSize); err != nil {
-		log.Printf("Error parsing form: %v", err)
-		http.Error(w, "Error parsing form", http.StatusBadRequest)
-		return
-	}
-
-	// Get the file from the form
-	file, header, err := r.FormFile(formFileName)
+	file, header, err := r.FormFile("myFile")
 	if err != nil {
-		log.Printf("Error getting file from form: %v", err)
-		http.Error(w, "Error getting file", http.StatusBadRequest)
+		http.Error(w, "Не удалось получить файл из формы", http.StatusInternalServerError)
 		return
 	}
 	defer file.Close()
 
-	// Read the file content
 	data, err := io.ReadAll(file)
 	if err != nil {
-		log.Printf("Error reading file: %v", err)
-		http.Error(w, "Error reading file", http.StatusInternalServerError)
+		http.Error(w, "Не удалось прочитать файл", http.StatusInternalServerError)
 		return
 	}
 
-	// Convert the content
-	content := string(data)
-	result, err := service.AutoDetectAndConvert(content)
+	converted, err := service.Convert(string(data))
 	if err != nil {
-		log.Printf("Error converting content: %v", err)
-		http.Error(w, "Error converting content", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Ошибка конвертации: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	// Create a local file with the result
-	fileName := time.Now().UTC().Format("2006-01-02T15-04-05.999999999") + filepath.Ext(header.Filename)
-	if err := os.WriteFile(fileName, []byte(result), 0644); err != nil {
-		log.Printf("Error writing result file: %v", err)
-		http.Error(w, "Error saving result", http.StatusInternalServerError)
+	// Генерация имени файла с таймстемпом
+	ext := filepath.Ext(header.Filename)
+	filename := fmt.Sprintf("converted_%s%s", strings.ReplaceAll(time.Now().UTC().Format(time.RFC3339), ":", "-"), ext)
+
+	outFile, err := os.Create(filepath.Join(".", filename))
+
+	if err != nil {
+		http.Error(w, "Не удалось создать файл", http.StatusInternalServerError)
+		return
+	}
+	defer outFile.Close()
+
+	if _, err := outFile.Write([]byte(converted)); err != nil {
+		http.Error(w, "Не удалось записать результат", http.StatusInternalServerError)
 		return
 	}
 
-	// Return the result to the client
-	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte(result))
+	// Возвращаем пользователю результат
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = w.Write([]byte(converted))
+	w.WriteHeader(http.StatusOK)
 }

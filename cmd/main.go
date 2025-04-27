@@ -8,10 +8,15 @@ import (
 )
 
 func main() {
-	logger := log.New(os.Stdout, "morse-converter: ", log.LstdFlags|log.Lshortfile)
+	// Создаём логгер
+	logger := log.New(os.Stdout, "http: ", log.LstdFlags)
 
-	srv := server.NewServer(logger)
-	if err := srv.Start(); err != nil {
-		logger.Fatalf("Server failed to start: %v", err)
+	// Создаём сервер
+	srv := server.New(logger)
+
+	// Запускаем сервер
+	logger.Println("Сервер запущен на http://localhost:8080")
+	if err := srv.HTTP.ListenAndServe(); err != nil {
+		logger.Fatal(err)
 	}
 }

@@ -9,18 +9,21 @@ import (
 )
 
 type Server struct {
-	logger     *log.Logger
-	httpServer *http.Server
+	Logger *log.Logger
+	HTTP   *http.Server
 }
 
-func NewServer(logger *log.Logger) *Server {
-	router := http.NewServeMux()
-	router.HandleFunc("/", handlers.RootHandler)
-	router.HandleFunc("/upload", handlers.UploadHandler)
+// New создаёт и настраивает новый сервер
+func New(logger *log.Logger) *Server {
+	mux := http.NewServeMux()
 
-	httpServer := &http.Server{
+	// Регистрация хендлеров
+	mux.HandleFunc("/", handlers.ServeHome)
+	mux.HandleFunc("/upload", handlers.UploadHandler)
+
+	srv := &http.Server{
 		Addr:         ":8080",
-		Handler:      router,
+		Handler:      mux,
 		ErrorLog:     logger,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -28,12 +31,7 @@ func NewServer(logger *log.Logger) *Server {
 	}
 
 	return &Server{
-		logger:     logger,
-		httpServer: httpServer,
+		Logger: logger,
+		HTTP:   srv,
 	}
-}
-
-func (s *Server) Start() error {
-	s.logger.Printf("Server starting on %s", s.httpServer.Addr)
-	return s.httpServer.ListenAndServe()
 }
