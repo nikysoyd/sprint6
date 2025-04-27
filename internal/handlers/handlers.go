@@ -19,7 +19,7 @@ import (
 func ServeHome(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	http.ServeFile(w, r, "pwd/index.html")
+	http.ServeFile(w, r, "sprint6/index.html")
 }
 
 // UploadHandler обрабатывает загрузку файла
