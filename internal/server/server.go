@@ -8,23 +8,19 @@ import (
 	"github.com/nikysoyd/sprint6/internal/handlers"
 )
 
-// Server содержит логгер и сам HTTP сервер
 type Server struct {
-	Logger *log.Logger
-	HTTP   *http.Server
+	logger     *log.Logger
+	httpServer *http.Server
 }
 
-// New создаёт и настраивает новый сервер
-func New(logger *log.Logger) *Server {
-	mux := http.NewServeMux()
+func NewServer(logger *log.Logger) *Server {
+	router := http.NewServeMux()
+	router.HandleFunc("/", handlers.RootHandler)
+	router.HandleFunc("/upload", handlers.UploadHandler)
 
-	// Регистрация хендлеров
-	mux.HandleFunc("/", handlers.ServeHome)
-	mux.HandleFunc("/upload", handlers.UploadHandler)
-
-	srv := &http.Server{
+	httpServer := &http.Server{
 		Addr:         ":8080",
-		Handler:      mux,
+		Handler:      router,
 		ErrorLog:     logger,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -32,7 +28,12 @@ func New(logger *log.Logger) *Server {
 	}
 
 	return &Server{
-		Logger: logger,
-		HTTP:   srv,
+		logger:     logger,
+		httpServer: httpServer,
 	}
+}
+
+func (s *Server) Start() error {
+	s.logger.Printf("Server starting on %s", s.httpServer.Addr)
+	return s.httpServer.ListenAndServe()
 }
