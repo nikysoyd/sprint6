@@ -5,7 +5,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/nikysoyd/sprint6/pkg/morse"
+	//"strings"
+
+	"github.com/nikysoyd/sprint6/internal/service"
 )
 
 type Server struct {
@@ -35,7 +37,11 @@ func NewServer(logger *log.Logger) (*Server, error) {
 			return
 		}
 
-		result := morse.ToMorse(string(body))
+		result, err := service.Convert(string(body))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		w.Write([]byte(result))
 	})
 
@@ -52,7 +58,11 @@ func NewServer(logger *log.Logger) (*Server, error) {
 			return
 		}
 
-		result := morse.ToText(string(body))
+		result, err := service.Convert(string(body))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		w.Write([]byte(result))
 	})
 
@@ -70,21 +80,17 @@ func NewServer(logger *log.Logger) (*Server, error) {
 		}
 
 		input := string(body)
-		var result string
-
-		// Проверяем, является ли ввод кодом Морзе
-		isMorse := true
-		for _, r := range input {
-			if r != '.' && r != '-' && r != ' ' && r != '/' {
-				isMorse = false
-				break
-			}
+		result, err := service.Convert(input)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
 
-		if isMorse {
-			result = morse.ToText(input)
+		// Для теста /upload_random сохраняем исходные данные
+		if isMorse(input) {
+			w.Header().Set("Original-Morse", input)
 		} else {
-			result = morse.ToMorse(input)
+			w.Header().Set("Original-Text", input)
 		}
 
 		w.Write([]byte(result))
@@ -101,4 +107,14 @@ func NewServer(logger *log.Logger) (*Server, error) {
 
 func (s *Server) ListenAndServe() error {
 	return s.server.ListenAndServe()
+}
+
+// Вспомогательная функция для проверки, является ли строка кодом Морзе
+func isMorse(s string) bool {
+	for _, r := range s {
+		if r != '.' && r != '-' && r != ' ' && r != '/' {
+			return false
+		}
+	}
+	return true
 }
