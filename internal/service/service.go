@@ -3,20 +3,26 @@ package service
 import (
 	"errors"
 	"strings"
+	//"unicode"
 )
 
-var morseCode = map[string]string{
-	"A": ".-", "B": "-...", "C": "-.-.", "D": "-..", "E": ".",
-	"F": "..-.", "G": "--.", "H": "....", "I": "..", "J": ".---",
-	"K": "-.-", "L": ".-..", "M": "--", "N": "-.", "O": "---",
-	"P": ".--.", "Q": "--.-", "R": ".-.", "S": "...", "T": "-",
-	"U": "..-", "V": "...-", "W": ".--", "X": "-..-", "Y": "-.--",
-	"Z": "--..", "0": "-----", "1": ".----", "2": "..---", "3": "...--",
-	"4": "....-", "5": ".....", "6": "-....", "7": "--...", "8": "---..",
-	"9": "----.",
+var morseCode = map[rune]string{
+	'А': ".-", 'Б': "-...", 'В': ".--", 'Г': "--.", 'Д': "-..",
+	'Е': ".", 'Ж': "...-", 'З': "--..", 'И': "..", 'Й': ".---",
+	'К': "-.-", 'Л': ".-..", 'М': "--", 'Н': "-.", 'О': "---",
+	'П': ".--.", 'Р': ".-.", 'С': "...", 'Т': "-", 'У': "..-",
+	'Ф': "..-.", 'Х': "....", 'Ц': "-.-.", 'Ч': "---.", 'Ш': "----",
+	'Щ': "--.-", 'Ъ': "--.--", 'Ы': "-.--", 'Ь': "-..-", 'Э': "..-..",
+	'Ю': "..--", 'Я': ".-.-",
+	'0': "-----", '1': ".----", '2': "..---", '3': "...--",
+	'4': "....-", '5': ".....", '6': "-....", '7': "--...",
+	'8': "---..", '9': "----.",
+	'.': "......", ',': ".-.-.-", ':': "---...", '?': "..--..",
+	';': "-.-.-", '(': "-.--.", ')': "-.--.-", '"': ".-..-.",
+	'\'': ".----.", ' ': "/",
 }
 
-var reverseMorse = make(map[string]string)
+var reverseMorse = make(map[string]rune)
 
 func init() {
 	for k, v := range morseCode {
@@ -24,15 +30,21 @@ func init() {
 	}
 }
 
-// Convert определяет тип входной строки (текст или код Морзе) и конвертирует
+// Convert определяет тип входной строки и конвертирует
 func Convert(input string) (string, error) {
 	input = strings.TrimSpace(input)
 	if input == "" {
-		return "", errors.New("empty input")
+		return "", errors.New("пустая строка")
 	}
 
 	// Проверяем, является ли строка кодом Морзе
-	isMorse := strings.ContainsAny(input, ".-") && !strings.ContainsAny(input, "abcdefghijklmnopqrstuvwxyz0123456789")
+	isMorse := true
+	for _, r := range input {
+		if !isMorseSymbol(r) && r != ' ' && r != '/' {
+			isMorse = false
+			break
+		}
+	}
 
 	if isMorse {
 		return morseToText(input)
@@ -40,53 +52,55 @@ func Convert(input string) (string, error) {
 	return textToMorse(input)
 }
 
-// morseToText конвертирует код Морзе в текст
+func isMorseSymbol(r rune) bool {
+	return r == '.' || r == '-'
+}
+
+// morseToText конвертирует код Морзе в русский текст
 func morseToText(morse string) (string, error) {
 	words := strings.Split(morse, " / ")
 	var result strings.Builder
 
 	for i, word := range words {
-		chars := strings.Split(word, " ")
-		for j, char := range chars {
-			if char == "" {
+		codes := strings.Split(word, " ")
+		for _, code := range codes {
+			if code == "" {
 				continue
 			}
-			if letter, exists := reverseMorse[char]; exists {
-				result.WriteString(letter)
+			if char, exists := reverseMorse[code]; exists {
+				result.WriteRune(char)
 			} else {
-				return "", errors.New("invalid morse code: " + char)
-			}
-			if j < len(chars)-1 {
-				result.WriteString("")
+				return "", errors.New("некорректный код Морзе: " + code)
 			}
 		}
 		if i < len(words)-1 {
-			result.WriteString(" ")
+			result.WriteRune(' ')
 		}
 	}
 
 	return result.String(), nil
 }
 
-// textToMorse конвертирует текст в код Морзе
+// textToMorse конвертирует русский текст в код Морзе
 func textToMorse(text string) (string, error) {
 	text = strings.ToUpper(text)
-	words := strings.Split(text, " ")
 	var result strings.Builder
+	firstChar := true
 
-	for i, word := range words {
-		for j, char := range word {
-			if code, exists := morseCode[string(char)]; exists {
-				result.WriteString(code)
-				if j < len(word)-1 {
-					result.WriteString(" ")
-				}
+	for _, char := range text {
+		if !firstChar {
+			if char == ' ' {
+				result.WriteString(" / ")
 			} else {
-				return "", errors.New("invalid character: " + string(char))
+				result.WriteRune(' ')
 			}
 		}
-		if i < len(words)-1 {
-			result.WriteString(" / ")
+
+		if code, exists := morseCode[char]; exists {
+			result.WriteString(code)
+			firstChar = false
+		} else if char != ' ' {
+			return "", errors.New("неподдерживаемый символ: " + string(char))
 		}
 	}
 
