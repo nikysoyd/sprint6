@@ -28,3 +28,8 @@ func NewServer(logger *log.Logger) (*Server, error) {
 		server: server,
 	}, nil
 }
+
+// Добавляем метод ListenAndServe для структуры Server
+func (s *Server) ListenAndServe() error {
+	return s.server.ListenAndServe()
+}
