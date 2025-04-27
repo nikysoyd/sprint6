@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/nikysoyd/sprint6/service" // Замените на актуальный путь к пакету service
+	"github.com/nikysoyd/sprint6/internal/service" // Замените на актуальный путь к пакету service
 )
 
 // IndexHandler обрабатывает запрос к корневому эндпоинту /
