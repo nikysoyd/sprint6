@@ -13,13 +13,11 @@ type Server struct {
 	HTTP   *http.Server
 }
 
-// New создаёт и настраивает новый сервер
-func New(logger *log.Logger) *Server {
+func NewServer(logger *log.Logger) *Server {
 	mux := http.NewServeMux()
 
-	// Регистрация хендлеров
-	mux.HandleFunc("/", handlers.ServeHome)
-	mux.HandleFunc("/upload", handlers.UploadHandler)
+	mux.HandleFunc("/", handlers.RootServeHome)
+	mux.HandleFunc("/upload", handlers.UploadFileHandler)
 
 	srv := &http.Server{
 		Addr:         ":8080",

@@ -4,16 +4,14 @@ import (
 	"errors"
 	"strings"
 
-	//"unicode"
-
 	"github.com/nikysoyd/sprint6/pkg/morse"
 )
 
 func isMorse(input string) bool {
-	isInvalid := func(r rune) bool {
+	isletter := func(r rune) bool {
 		return !strings.ContainsRune(".-/ ", r)
 	}
-	return !strings.ContainsFunc(input, isInvalid)
+	return !strings.ContainsFunc(input, isletter)
 }
 
 func Convert(input string) (string, error) {
@@ -25,16 +23,14 @@ func Convert(input string) (string, error) {
 	if isMorse(input) {
 		result := morse.ToText(input)
 		if strings.TrimSpace(result) == "" {
-			return "", errors.New("не удалось распознать код Морзе")
+			return "", errors.New("unknown MorseCode")
 		}
 		return result, nil
 	}
 
-	// Проверка: все ли руны в тексте — буквы, цифры или знаки препинания
-
 	result := morse.ToMorse(input)
 	if strings.TrimSpace(result) == "" {
-		return "", errors.New("не удалось преобразовать текст в код Морзе")
+		return "", errors.New("error converting code to Morse")
 	}
 	return result, nil
 }

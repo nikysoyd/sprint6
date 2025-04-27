@@ -8,15 +8,13 @@ import (
 )
 
 func main() {
-	// Создаём логгер
+
 	logger := log.New(os.Stdout, "http: ", log.LstdFlags)
 
-	// Создаём сервер
-	srv := server.New(logger)
+	newSrv := server.NewServer(logger)
 
-	// Запускаем сервер
 	logger.Println("Сервер запущен на http://localhost:8080")
-	if err := srv.HTTP.ListenAndServe(); err != nil {
+	if err := newSrv.HTTP.ListenAndServe(); err != nil {
 		logger.Fatal(err)
 	}
 }
