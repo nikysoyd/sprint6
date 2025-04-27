@@ -6,70 +6,64 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
-	"github.com/nikysoyd/sprint6/internal/service" // Замените на актуальный путь к пакету service
+	"github.com/nikysoyd/sprint6/internal/service"
 )
 
-// IndexHandler обрабатывает запрос к корневому эндпоинту /
-func IndexHandler(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "index.html")
+// ServeHome обрабатывает корневой эндпоинт и отдает index.html
+func ServeHome(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	http.ServeFile(w, r, "../index.html")
 }
 
-// UploadHandler обрабатывает загрузку файла и конвертацию
+// UploadHandler обрабатывает загрузку файла
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		http.Error(w, "Ошибка при разборе формы", http.StatusInternalServerError)
 		return
 	}
 
-	// Парсинг формы с лимитом 10MB
-	err := r.ParseMultipartForm(10 << 20)
+	file, header, err := r.FormFile("myFile")
 	if err != nil {
-		http.Error(w, "Failed to parse form: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Получение файла из формы
-	file, handler, err := r.FormFile("file")
-	if err != nil {
-		http.Error(w, "Failed to get file: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Не удалось получить файл из формы", http.StatusInternalServerError)
 		return
 	}
 	defer file.Close()
 
-	// Чтение содержимого файла
 	data, err := io.ReadAll(file)
 	if err != nil {
-		http.Error(w, "Failed to read file: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Не удалось прочитать файл", http.StatusInternalServerError)
 		return
 	}
 
-	// Конвертация данных с помощью функции из пакета service
-	result, err := service.Convert(string(data))
+	converted, err := service.Convert(string(data))
 	if err != nil {
-		http.Error(w, "Conversion failed: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Ошибка конвертации: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	// Генерация имени выходного файла
-	ext := filepath.Ext(handler.Filename)
-	outputFilename := fmt.Sprintf("output_%s%s", time.Now().UTC().Format("20060102150405"), ext)
-	outputFile, err := os.Create(outputFilename)
+	// Генерация имени файла с таймстемпом
+	ext := filepath.Ext(header.Filename)
+	filename := fmt.Sprintf("converted_%s%s", strings.ReplaceAll(time.Now().UTC().Format(time.RFC3339), ":", "-"), ext)
+
+	outFile, err := os.Create(filepath.Join(".", filename))
+
 	if err != nil {
-		http.Error(w, "Failed to create output file: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Не удалось создать файл", http.StatusInternalServerError)
 		return
 	}
-	defer outputFile.Close()
+	defer outFile.Close()
 
-	// Запись результата в файл
-	_, err = outputFile.WriteString(result)
-	if err != nil {
-		http.Error(w, "Failed to write to output file: "+err.Error(), http.StatusInternalServerError)
+	if _, err := outFile.Write([]byte(converted)); err != nil {
+		http.Error(w, "Не удалось записать результат", http.StatusInternalServerError)
 		return
 	}
 
-	// Отправка результата клиенту
+	// Возвращаем пользователю результат
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = w.Write([]byte(converted))
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Conversion successful. Result: %s\nSaved to: %s", result, outputFilename)
 }
