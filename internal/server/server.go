@@ -1,21 +1,13 @@
 package server
 
 import (
+	"io"
 	"log"
 	"net/http"
 	"strings"
-)
 
-// Morse-код для русских букв (упрощенный пример)
-var morseCode = map[rune]string{
-	'А': ".-", 'Б': "-...", 'В': ".--", 'Г': "--.", 'Д': "-..",
-	'Е': ".", 'Ж': "...-", 'З': "--..", 'И': "..", 'Й': ".---",
-	'К': "-.-", 'Л': ".-..", 'М': "--", 'Н': "-.", 'О': "---",
-	'П': ".--.", 'Р': ".-.", 'С': "...", 'Т': "-", 'У': "..-",
-	'Ф': "..-.", 'Х': "....", 'Ц': "-.-.", 'Ч': "---.", 'Ш': "----",
-	'Щ': "--.-", 'Ъ': "--.--", 'Ы': "-.--", 'Ь': "-..-", 'Э': "..-..",
-	'Ю': "..--", 'Я': ".-.-",
-}
+	"github.com/nikysoyd/sprint6/pkg/morse" // Импортируем ваш пакет morse
+)
 
 type Server struct {
 	logger *log.Logger
@@ -31,22 +23,63 @@ func NewServer(logger *log.Logger) (*Server, error) {
 	})
 
 	mux.HandleFunc("/text-to-morse", func(w http.ResponseWriter, r *http.Request) {
-		text := r.URL.Query().Get("text")
-		var morse strings.Builder
-		for _, char := range strings.ToUpper(text) {
-			if code, ok := morseCode[char]; ok {
-				morse.WriteString(code + " ")
-			}
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
 		}
-		w.Write([]byte(morse.String()))
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+
+		text := string(body)
+		morseCode := morse.ToMorse(text)
+		w.Write([]byte(morseCode))
 	})
 
 	mux.HandleFunc("/morse-to-text", func(w http.ResponseWriter, r *http.Request) {
-		// Реализуйте обратное преобразование (морзе → текст)
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+
+		morseCode := string(body)
+		text := morse.ToText(morseCode)
+		w.Write([]byte(text))
 	})
 
 	mux.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
-		// Обработка загрузки файла/текста
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+
+		content := string(body)
+
+		// Определяем тип контента (текст или морзе)
+		if strings.ContainsAny(content, ".-") {
+			// Это код Морзе
+			text := morse.ToText(content)
+			w.Write([]byte(text))
+		} else {
+			// Это обычный текст
+			morseCode := morse.ToMorse(content)
+			w.Write([]byte(morseCode))
+		}
 	})
 
 	server := &http.Server{
