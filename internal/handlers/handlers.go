@@ -18,6 +18,7 @@ func RootServeHome(w http.ResponseWriter, r *http.Request) {
 	} else {
 		http.Error(w, "Метод не поддерживается", http.StatusMethodNotAllowed)
 	}
+	http.ServeFile(w, r, "index.html")
 }
 
 func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
