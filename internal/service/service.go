@@ -23,7 +23,7 @@ func Convert(input string) (string, error) {
 	if isMorse(input) {
 		result := morse.ToText(input)
 		if strings.TrimSpace(result) == "" {
-			return "", errors.New("unknown MorseCode")
+			return "", morse.ErrNoEncoding{}
 		}
 		return result, nil
 	}

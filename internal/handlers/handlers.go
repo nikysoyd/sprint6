@@ -13,9 +13,11 @@ import (
 )
 
 func RootServeHome(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	http.ServeFile(w, r, "index.html")
+	if r.Method == http.MethodGet {
+		// Обработка GET запроса
+	} else {
+		http.Error(w, "Метод не поддерживается", http.StatusMethodNotAllowed)
+	}
 }
 
 func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
